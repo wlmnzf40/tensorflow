@@ -2,13 +2,13 @@
 """
 Generate a GEMM (Matrix Multiply) SavedModel for TF Serving.
 
-If the locally-built TF wheel has symbol issues, run in a clean venv:
+If the locally-built TF wheel has symbol issues, run in a clean conda env:
 
-  python3 -m venv /tmp/tf_gen_venv
-  source /tmp/tf_gen_venv/bin/activate
+  conda create -n tf_gen python=3.10 -y
+  conda activate tf_gen
   pip install tensorflow-cpu     # standalone, no GPU/CUDA deps
   python3 generate_model.py
-  deactivate
+  conda deactivate
 """
 import os
 import sys
@@ -20,9 +20,9 @@ def main(output_dir: str = 'gemm_model'):
     except ImportError as e:
         sys.exit(
             f"Cannot import tensorflow: {e}\n\n"
-            "Quick fix (clean venv, no GPU/CUDA needed):\n"
-            "  python3 -m venv /tmp/tf_gen_venv\n"
-            "  source /tmp/tf_gen_venv/bin/activate\n"
+            "Quick fix (clean conda env, no GPU/CUDA needed):\n"
+            "  conda create -n tf_gen python=3.10 -y\n"
+            "  conda activate tf_gen\n"
             "  pip install tensorflow-cpu\n"
             "  python3 generate_model.py\n"
         )

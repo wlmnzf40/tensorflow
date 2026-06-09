@@ -67,12 +67,12 @@ bazel-bin/tensorflow_serving/model_servers/tensorflow_model_server
 ```bash
 cd /path/to/tf_serving_gemm
 
-# 如果本地 TF Python 符号有问题，用干净的 venv：
-python3 -m venv /tmp/tf_gen_venv
-source /tmp/tf_gen_venv/bin/activate
+# 如果本地 TF Python 符号有问题，用干净的 conda 环境：
+conda create -n tf_gen python=3.10 -y
+conda activate tf_gen
 pip install tensorflow-cpu      # 轻量，不需要 GPU
 python3 generate_model.py       # 生成 gemm_model/1/
-deactivate
+conda deactivate
 ```
 
 ---
