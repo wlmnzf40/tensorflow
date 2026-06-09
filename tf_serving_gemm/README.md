@@ -34,19 +34,7 @@ git checkout 2.15.0
 ```bash
 cd /home/wanglimin/tf_serving
 
-/home/wanglimin/bazel-7.4.1 build -c opt \
-  --distdir=/home/wanglimin/tf_new/dist \
-  --define=no_cuda_support=true \
-  --define=no_nccl_support=true \
-  --define=no_kafka_support=true \
-  --define=no_google_cloud_support=true \
-  --repo_env=CC=/usr/bin/gcc \
-  --repo_env=CXX=/usr/bin/g++ \
-  --host_linkopt=-Wl,--disable-new-dtags \
-  --host_linkopt=-Wl,-rpath,/home/wanglimin/gcc-12.3.1-2025.12-aarch64-linux/lib64 \
-  --linkopt=-Wl,--disable-new-dtags \
-  --linkopt=-Wl,-rpath,/home/wanglimin/gcc-12.3.1-2025.12-aarch64-linux/lib64 \
-  //tensorflow_serving/model_servers:tensorflow_model_server
+/home/wanglimin/bazel-7.4.1 build -c opt --distdir=/home/wanglimin/tf_new/dist --define=no_cuda_support=true --define=no_nccl_support=true --define=no_kafka_support=true --define=no_google_cloud_support=true --repo_env=CC=/usr/bin/gcc --repo_env=CXX=/usr/bin/g++ --host_linkopt=-Wl,--disable-new-dtags --host_linkopt=-Wl,-rpath,/home/wanglimin/gcc-12.3.1-2025.12-aarch64-linux/lib64 --linkopt=-Wl,--disable-new-dtags --linkopt=-Wl,-rpath,/home/wanglimin/gcc-12.3.1-2025.12-aarch64-linux/lib64 --override_repository=org_boost=/home/wanglimin/tf_dist/boost //tensorflow_serving/model_servers:tensorflow_model_server
 ```
 
 与你的 TF 命令相比的差异：
