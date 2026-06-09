@@ -2,57 +2,29 @@
 """
 Generate a GEMM (Matrix Multiply) SavedModel for TF Serving.
 
-Usage:
-  # Direct (if TF Python is working)
-  python3 generate_model.py
+If the locally-built TF wheel has symbol issues, run in a clean venv:
 
-  # Via Docker (recommended when local TF install is broken)
-  python3 generate_model.py --docker
+  python3 -m venv /tmp/tf_gen_venv
+  source /tmp/tf_gen_venv/bin/activate
+  pip install tensorflow-cpu     # standalone, no GPU/CUDA deps
+  python3 generate_model.py
+  deactivate
 """
-import argparse
 import os
-import subprocess
 import sys
 
 
-def generate_via_docker(output_dir: str):
-    abs_dir = os.path.abspath(output_dir)
-    os.makedirs(abs_dir, exist_ok=True)
-
-    # Inline the model-generation code and run it inside the official TF image.
-    model_code = """
-import tensorflow as tf
-
-class GEMMModel(tf.Module):
-    @tf.function(input_signature=[
-        tf.TensorSpec([None, None], tf.float32, name='A'),
-        tf.TensorSpec([None, None], tf.float32, name='B'),
-    ])
-    def __call__(self, A, B):
-        return {'output': tf.linalg.matmul(A, B)}
-
-model = GEMMModel()
-tf.saved_model.save(model, '/export/1')
-print('Model saved to /export/1')
-"""
-    cmd = [
-        "docker", "run", "--rm",
-        "-v", f"{abs_dir}:/export",
-        "tensorflow/tensorflow:2.15.0",
-        "python3", "-c", model_code,
-    ]
-    print("Running:", " ".join(cmd))
-    subprocess.run(cmd, check=True)
-    print(f"Done. SavedModel written to: {abs_dir}/1")
-
-
-def generate_direct(output_dir: str):
+def main(output_dir: str = 'gemm_model'):
     try:
         import tensorflow as tf
     except ImportError as e:
         sys.exit(
-            f"TensorFlow not importable: {e}\n"
-            "Use --docker to generate via Docker instead."
+            f"Cannot import tensorflow: {e}\n\n"
+            "Quick fix (clean venv, no GPU/CUDA needed):\n"
+            "  python3 -m venv /tmp/tf_gen_venv\n"
+            "  source /tmp/tf_gen_venv/bin/activate\n"
+            "  pip install tensorflow-cpu\n"
+            "  python3 generate_model.py\n"
         )
 
     class GEMMModel(tf.Module):
@@ -63,21 +35,13 @@ def generate_direct(output_dir: str):
         def __call__(self, A, B):
             return {'output': tf.linalg.matmul(A, B)}
 
-    model = GEMMModel()
     save_path = os.path.join(output_dir, '1')
-    tf.saved_model.save(model, save_path)
-    print(f"Done. SavedModel written to: {save_path}")
+    tf.saved_model.save(GEMMModel(), save_path)
+    print(f"SavedModel written to: {os.path.abspath(save_path)}")
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--output', default='gemm_model',
-                        help='Output directory (a "1/" sub-dir is created)')
-    parser.add_argument('--docker', action='store_true',
-                        help='Use the official TF Docker image to generate the model')
-    args = parser.parse_args()
-
-    if args.docker:
-        generate_via_docker(args.output)
-    else:
-        generate_direct(args.output)
+    import argparse
+    p = argparse.ArgumentParser()
+    p.add_argument('--output', default='gemm_model')
+    main(p.parse_args().output)
