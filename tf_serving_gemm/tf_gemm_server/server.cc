@@ -1,15 +1,28 @@
 /*
- * GEMM gRPC server — backed by TensorFlow C++ Session / MatMul op kernel.
+ * GEMM gRPC server — backed by the TensorFlow C++ runtime (MatMul op kernel).
  *
- * The graph is built once at startup with dynamic-shape Placeholders,
- * then reused for every call (mutex-protected).
+ * This is the bazel-integrated, TF-backed counterpart to ../grpc_gemm_server
+ * (which uses a raw Eigen backend and CMake). Same proto / same gRPC interface,
+ * so the existing python_client / cpp_client work against either one — only the
+ * port differs (Eigen server: 50051, this TF server: 50052).
  *
- * Build:
- *   /home/wanglimin/bazel-7.4.1 build -c opt <common-flags> \
- *     //tensorflow/tools/gemm_server:gemm_server
+ * The graph is built once at startup (dynamic-shape Placeholders -> MatMul) and
+ * reused for every call via a single mutex-protected ClientSession.
+ *
+ * Build (same flags you use for tensorflow_model_server, different target):
+ *   /home/wanglimin/bazel-7.4.1 build -c opt \
+ *     --distdir=/home/wanglimin/tf_new/dist \
+ *     --define=no_cuda_support=true --define=no_nccl_support=true \
+ *     --define=no_kafka_support=true --define=no_google_cloud_support=true \
+ *     --repo_env=CC=/usr/bin/gcc --repo_env=CXX=/usr/bin/g++ \
+ *     --host_linkopt=-Wl,--disable-new-dtags \
+ *     --host_linkopt=-Wl,-rpath,/home/wanglimin/gcc-12.3.1-2025.12-aarch64-linux/lib64 \
+ *     --linkopt=-Wl,--disable-new-dtags \
+ *     --linkopt=-Wl,-rpath,/home/wanglimin/gcc-12.3.1-2025.12-aarch64-linux/lib64 \
+ *     //tf_serving_gemm/tf_gemm_server:gemm_server
  *
  * Run:
- *   ./bazel-bin/tensorflow/tools/gemm_server/gemm_server [--addr=0.0.0.0:50052]
+ *   ./bazel-bin/tf_serving_gemm/tf_gemm_server/gemm_server [--addr=0.0.0.0:50052]
  */
 
 #include <algorithm>
@@ -27,10 +40,10 @@
 #include "tensorflow/cc/ops/standard_ops.h"   // generated: MatMul, Placeholder
 #include "tensorflow/core/framework/tensor.h"
 
-// gRPC + generated stubs
+// gRPC + generated stubs (paths are repo-root-relative -> the bazel package path)
 #include "grpcpp/grpcpp.h"
-#include "tensorflow/tools/gemm_server/proto/gemm.grpc.pb.h"
-#include "tensorflow/tools/gemm_server/proto/gemm.pb.h"
+#include "tf_serving_gemm/tf_gemm_server/proto/gemm.grpc.pb.h"
+#include "tf_serving_gemm/tf_gemm_server/proto/gemm.pb.h"
 
 namespace tf    = tensorflow;
 namespace tfops = tensorflow::ops;
@@ -58,24 +71,22 @@ static tf::Tensor make_random(int rows, int cols) {
 
 // ── GEMMRunner ────────────────────────────────────────────────────────────────
 
-// Wraps a single TF graph: Placeholder(A) -> MatMul -> Placeholder(B) -> C.
+// Wraps a single TF graph: Placeholder(A), Placeholder(B) -> MatMul -> C.
 // Dynamic shapes: accepts any [M,K] x [K,N] without rebuilding the graph.
 class GEMMRunner {
 public:
     GEMMRunner() : scope_(tf::Scope::NewRootScope()) {
-        // Build graph once.  A_ph_, B_ph_, C_op_ are tf::Output (implicitly
-        // converted from ops::Placeholder / ops::MatMul via operator Output()).
         auto ph_a = tfops::Placeholder(scope_.WithOpName("A"), tf::DT_FLOAT);
         auto ph_b = tfops::Placeholder(scope_.WithOpName("B"), tf::DT_FLOAT);
         auto mm   = tfops::MatMul(scope_.WithOpName("C"), ph_a, ph_b);
         TF_CHECK_OK(scope_.status());
-        A_ph_ = ph_a;  // implicit Output conversion
+        A_ph_ = ph_a;  // implicit ops::Placeholder -> tf::Output conversion
         B_ph_ = ph_b;
         C_op_ = mm;
         session_ = std::make_unique<tf::ClientSession>(scope_);
     }
 
-    // C = MatMul(A, B) via TF kernel. Returns compute-only time (ms).
+    // C = MatMul(A, B) via the TF kernel. Returns compute-only time (ms).
     double Run(const tf::Tensor& A, const tf::Tensor& B, tf::Tensor* C_out) {
         std::vector<tf::Tensor> outputs;
         std::lock_guard<std::mutex> lk(mu_);
@@ -89,7 +100,7 @@ public:
 
 private:
     tf::Scope  scope_;
-    tf::Output A_ph_, B_ph_, C_op_;  // Output is default-constructible
+    tf::Output A_ph_, B_ph_, C_op_;
     std::unique_ptr<tf::ClientSession> session_;
     std::mutex mu_;
 };

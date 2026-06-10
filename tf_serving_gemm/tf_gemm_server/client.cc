@@ -1,10 +1,11 @@
 /*
- * GEMM gRPC client — works against both the TF server (port 50052)
- * and the Eigen server (port 50051).
+ * GEMM gRPC client — same wire protocol as ../grpc_gemm_server, so it works
+ * against both the TF server (default port 50052) and the Eigen server (50051);
+ * just pass --host=localhost:50051 to hit the Eigen one.
  *
  * Build:
- *   /home/wanglimin/bazel-7.4.1 build -c opt <common-flags> \
- *     //tensorflow/tools/gemm_server:gemm_client
+ *   /home/wanglimin/bazel-7.4.1 build -c opt <same flags as server> \
+ *     //tf_serving_gemm/tf_gemm_server:gemm_client
  *
  * Usage:
  *   # sweep (default):
@@ -12,6 +13,9 @@
  *
  *   # single compute call:
  *   ./gemm_client --mode=compute --M=1024 --K=1024 --N=1024 --iters=50
+ *
+ *   # compare against the Eigen server:
+ *   ./gemm_client --host=localhost:50051 --mode=sweep
  */
 
 #include <algorithm>
@@ -26,8 +30,8 @@
 #include <vector>
 
 #include "grpcpp/grpcpp.h"
-#include "tensorflow/tools/gemm_server/proto/gemm.grpc.pb.h"
-#include "tensorflow/tools/gemm_server/proto/gemm.pb.h"
+#include "tf_serving_gemm/tf_gemm_server/proto/gemm.grpc.pb.h"
+#include "tf_serving_gemm/tf_gemm_server/proto/gemm.pb.h"
 
 using Clock = std::chrono::steady_clock;
 using Stub  = gemm::GEMMService::Stub;
